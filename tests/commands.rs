@@ -62,9 +62,29 @@ fn blit_centered_line() {
         .iter()
         .map(ratatui_core::buffer::Cell::symbol)
         .collect();
-    assert!(text.contains("center"));
-    assert!(text.starts_with("  "));
-    assert!(text.trim_end().len() < 20);
+    assert_eq!(text, format!("{}center{}", " ".repeat(7), " ".repeat(7)));
+}
+
+#[test]
+fn blit_right_aligned_line() {
+    let mut buf = Buffer::empty(Rect::new(0, 0, 20, 1));
+    let line = Line {
+        y: 0,
+        spans: vec![Span {
+            content: "right".to_string(),
+            style: None,
+        }],
+        alignment: Some(Alignment::Right),
+    };
+
+    blit_commands(buf.area, &[RenderCommand::Line(line)], &mut buf);
+
+    let text: String = buf
+        .content()
+        .iter()
+        .map(ratatui_core::buffer::Cell::symbol)
+        .collect();
+    assert_eq!(text, format!("{}right", " ".repeat(15)));
 }
 
 #[test]

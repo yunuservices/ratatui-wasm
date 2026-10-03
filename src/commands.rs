@@ -59,7 +59,7 @@ mod tests {
             .iter()
             .map(ratatui_core::buffer::Cell::symbol)
             .collect();
-        assert!(text.trim_start().starts_with("hi"), "got {text:?}");
+        assert_eq!(text, " hi       ");
     }
 
     #[test]
