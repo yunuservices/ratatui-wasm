@@ -1,0 +1,144 @@
+package ratatui:widget@0.1.0;
+
+/// Each component exports exactly one widget.
+interface widget {
+    record cell {
+        /// Column offset relative to the widget area.
+        x: u16,
+        /// Row offset relative to the widget area.
+        y: u16,
+        /// A single grapheme.
+        symbol: string,
+        fg: option<color>,
+        bg: option<color>,
+    }
+
+    record rgb-color {
+        r: u8,
+        g: u8,
+        b: u8,
+    }
+
+    variant color {
+        reset,
+        black,
+        red,
+        green,
+        yellow,
+        blue,
+        magenta,
+        cyan,
+        gray,
+        dark-gray,
+        light-red,
+        light-green,
+        light-yellow,
+        light-blue,
+        light-magenta,
+        light-cyan,
+        white,
+        rgb(rgb-color),
+    }
+
+    record style {
+        fg: option<color>,
+        bg: option<color>,
+        bold: bool,
+        italic: bool,
+        underline: bool,
+    }
+
+    record span {
+        content: string,
+        /// Terminal default when omitted.
+        style: option<style>,
+    }
+
+    enum alignment {
+        left,
+        center,
+        right,
+    }
+
+    record line {
+        /// Row offset relative to the widget area.
+        y: u16,
+        spans: list<span>,
+        /// Horizontal alignment within the widget area.
+        alignment: option<alignment>,
+    }
+
+    variant render-command {
+        cell(cell),
+        line(line),
+    }
+
+    record rect {
+        x: u16,
+        y: u16,
+        width: u16,
+        height: u16,
+    }
+
+    /// Draw commands and the state to pass to the next `render` call.
+    record render-result {
+        commands: list<render-command>,
+        state: option<list<u8>>,
+    }
+
+    variant widget-error {
+        capability-denied(string),
+        internal(string),
+    }
+
+    variant event {
+        key(key-event),
+        resize(resize-event),
+    }
+
+    record resize-event {
+        cols: u16,
+        rows: u16,
+    }
+
+    record key-event {
+        code: key-code,
+        /// Bitmask of modifiers (shift=1, ctrl=2, alt=4, super=8).
+        modifiers: u8,
+    }
+
+    variant key-code {
+        backspace,
+        enter,
+        left,
+        right,
+        up,
+        down,
+        home,
+        end,
+        page-up,
+        page-down,
+        tab,
+        back-tab,
+        delete,
+        insert,
+        esc,
+        codepoint(string),
+        /// Function key F1..F24.
+        function(u8),
+        null,
+    }
+
+    /// `state` is whatever the previous call returned.
+    render: func(area: rect, state: option<list<u8>>) -> result<render-result, widget-error>;
+
+    /// Returns true if the widget consumed the event.
+    handle-event: func(event: event) -> result<bool, widget-error>;
+
+    /// Capabilities the widget requires, such as "stdio:stdout".
+    capabilities: func() -> list<string>;
+}
+
+world wasm-widget {
+    export widget;
+}

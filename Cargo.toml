@@ -1,0 +1,75 @@
+[package]
+name = "ratatui-wasm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88.0"
+license = "MIT"
+repository = "https://github.com/yunuservices/ratatui-wasm"
+readme = "README.md"
+description = "Capability-based WebAssembly plugin host for Ratatui widgets"
+keywords = ["ratatui", "tui", "wasm", "plugin", "terminal"]
+categories = ["command-line-interface"]
+exclude = [".github", "examples/wasm-widgets/*/target"]
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4.5", features = ["derive"], optional = true }
+ratatui-core = "0.1.2"
+serde = { version = "1.0.219", default-features = false, features = ["derive"] }
+toml = "0.8"
+tracing = "0.1.37"
+wasmtime = { version = "47.0.3", features = ["component-model"] }
+wasmtime-wasi = "47.0.3"
+
+[features]
+default = []
+cli = ["dep:clap"]
+
+[[bin]]
+name = "ratatui-wasm"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[lints]
+workspace = true
+
+[workspace]
+resolver = "2"
+members = [".", "examples/wasm-demo"]
+default-members = ["."]
+exclude = ["examples/wasm-widgets/hello-rust"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+pedantic = { level = "warn", priority = -1 }
+as_underscore = "warn"
+deref_by_slicing = "warn"
+else_if_without_else = "warn"
+empty_line_after_doc_comments = "warn"
+equatable_if_let = "warn"
+fn_to_numeric_cast_any = "warn"
+format_push_string = "warn"
+implicit_clone = "warn"
+map_err_ignore = "warn"
+missing_const_for_fn = "warn"
+mixed_read_write_in_expression = "warn"
+mod_module_files = "warn"
+needless_pass_by_ref_mut = "warn"
+needless_raw_strings = "warn"
+or_fun_call = "warn"
+redundant_type_annotations = "warn"
+rest_pat_in_fully_bound_structs = "warn"
+string_lit_chars_any = "warn"
+string_slice = "warn"
+unnecessary_self_imports = "warn"
+use_self = "warn"
