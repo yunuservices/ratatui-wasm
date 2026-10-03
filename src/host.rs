@@ -4,7 +4,6 @@ use anyhow::Result;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::widgets::StatefulWidget;
-use wasmtime::component::Linker;
 use wasmtime::{Store, StoreLimits, StoreLimitsBuilder};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
@@ -26,21 +25,18 @@ pub struct PluginWidget {
 impl PluginWidget {
     /// Loads a `.wasm` component and fails if it requests a capability that was not granted.
     pub fn from_file(path: impl AsRef<Path>, capabilities: &[String]) -> Result<Self> {
-        let (engine, component) = cache::load_component(path.as_ref())?;
-
-        let mut linker = Linker::new(&engine);
-        wasmtime_wasi::p2::add_to_linker_sync(&mut linker)
-            .map_err(|e| anyhow::anyhow!("adding WASI to linker: {e}"))?;
+        let widget_pre = cache::load_widget(path.as_ref())?;
 
         let mut builder = WasiCtxBuilder::new();
         apply_capabilities(&mut builder, capabilities);
         let wasi = builder.build();
-        let mut store = Store::new(&engine, WasiState::new(wasi));
+        let mut store = Store::new(widget_pre.engine(), WasiState::new(wasi));
         store.limiter(|state| &mut state.limits);
         refuel(&mut store)?;
 
         let binding = Box::new(
-            WasmWidgetBinding::instantiate(&mut store, &component, &linker)
+            widget_pre
+                .instantiate(&mut store)
                 .map_err(|e| anyhow::anyhow!("instantiating wasm widget component: {e}"))?,
         );
 
@@ -230,7 +226,7 @@ fn refuel(store: &mut Store<WasiState>) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("setting widget fuel: {e}"))
 }
 
-struct WasiState {
+pub(crate) struct WasiState {
     ctx: WasiCtx,
     table: wasmtime::component::ResourceTable,
     limits: StoreLimits,

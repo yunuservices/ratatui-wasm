@@ -120,7 +120,7 @@ Every call into a plugin gets a fuel budget, and its memory is capped at 64 MiB,
 
 ## Hot reload and caching
 
-The host caches parsed WASM components keyed by file modification time. On each render it checks the file again, so a recompiled plugin is reloaded automatically while unmodified plugins stay fast.
+All plugins share one engine. Each component is compiled and linked once and cached by file modification time, so a render only creates a fresh instance. A recompiled plugin is picked up on the next frame.
 
 ## Writing guests in other languages
 
