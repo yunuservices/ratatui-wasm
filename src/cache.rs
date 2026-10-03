@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
@@ -19,12 +19,11 @@ static COMPONENT_CACHE: LazyLock<Mutex<HashMap<PathBuf, CachedComponent>>> =
 
 /// Returns the component at `path`, parsing it again only if the file changed.
 pub fn load_component(path: &Path) -> Result<(Engine, Component)> {
-    let mut cache = COMPONENT_CACHE.lock().expect("component cache poisoned");
     let mtime = fs::metadata(path)
         .and_then(|m| m.modified())
         .with_context(|| format!("reading metadata for {}", path.display()))?;
 
-    if let Some(cached) = cache.get(path)
+    if let Some(cached) = lock_cache().get(path)
         && cached.mtime == mtime
     {
         return Ok((cached.engine.clone(), cached.component.clone()));
@@ -35,7 +34,7 @@ pub fn load_component(path: &Path) -> Result<(Engine, Component)> {
     let component = Component::from_file(&engine, path)
         .map_err(|e| anyhow::anyhow!("loading wasm component from {}: {e}", path.display()))?;
 
-    cache.insert(
+    lock_cache().insert(
         path.to_path_buf(),
         CachedComponent {
             engine: engine.clone(),
@@ -45,4 +44,12 @@ pub fn load_component(path: &Path) -> Result<(Engine, Component)> {
     );
 
     Ok((engine, component))
+}
+
+/// The cache only holds finished entries, so a panic while it was locked cannot leave it
+/// half-written.
+fn lock_cache() -> MutexGuard<'static, HashMap<PathBuf, CachedComponent>> {
+    COMPONENT_CACHE
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
 }
