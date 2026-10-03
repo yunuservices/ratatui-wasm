@@ -1,0 +1,14 @@
+[package]
+name = "wasm-demo"
+publish = false
+license = "MIT"
+edition = "2024"
+rust-version = "1.88.0"
+
+[dependencies]
+crossterm = "0.29"
+ratatui = "0.30.2"
+ratatui-wasm = { path = "../.." }
+
+[lints]
+workspace = true
