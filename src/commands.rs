@@ -103,11 +103,10 @@ mod tests {
         let style = Style::new().fg(Color::Red).bg(Color::Blue);
         DrawCommand::Clear(style).render(Rect::new(0, 0, 4, 2), &mut buf);
 
-        for y in 0..2 {
-            for x in 0..4 {
-                assert_eq!(buf[(x, y)].symbol(), " ");
-                assert_eq!(buf[(x, y)].style(), style);
-            }
+        for cell in buf.content() {
+            assert_eq!(cell.symbol(), " ");
+            assert_eq!(cell.fg, Color::Red);
+            assert_eq!(cell.bg, Color::Blue);
         }
     }
 
