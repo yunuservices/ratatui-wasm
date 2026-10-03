@@ -192,7 +192,7 @@ mod tests {
         fs::write(temp_dir.join("other.txt"), "ignored").unwrap();
 
         let found = discover_manifests(&temp_dir).unwrap();
-        assert!(found.is_empty());
+        assert_eq!(found, Vec::<PathBuf>::new());
         let _ = fs::remove_dir_all(&temp_dir);
     }
 

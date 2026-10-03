@@ -87,7 +87,7 @@ fn stateful_widget_persists_state() {
         line.contains("Hello from WASM"),
         "expected rendered text via StatefulWasmWidget, got: {line:?}"
     );
-    assert!(state.is_empty(), "hello-rust does not emit state");
+    assert_eq!(state, Vec::<u8>::new(), "hello-rust does not emit state");
 }
 
 #[test]

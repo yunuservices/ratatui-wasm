@@ -97,8 +97,8 @@ version = "1.0.0"
 entry = "plugin.wasm"
 "#;
         let manifest = PluginManifest::parse(content).unwrap();
-        assert!(manifest.capabilities.required.is_empty());
-        assert!(manifest.capabilities.optional.is_empty());
-        assert_eq!(manifest.granted_capabilities().len(), 0);
+        assert_eq!(manifest.capabilities.required, Vec::<String>::new());
+        assert_eq!(manifest.capabilities.optional, Vec::<String>::new());
+        assert_eq!(manifest.granted_capabilities(), Vec::<String>::new());
     }
 }
