@@ -4,8 +4,8 @@ use anyhow::Result;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::widgets::StatefulWidget;
-use wasmtime::Store;
 use wasmtime::component::Linker;
+use wasmtime::{Store, StoreLimits, StoreLimitsBuilder};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 use crate::cache;
@@ -13,6 +13,9 @@ use crate::generated::WasmWidget as WasmWidgetBinding;
 use crate::manifest::PluginManifest;
 use crate::rect_to_wit;
 use crate::wit::{Event, RenderResult};
+
+const FUEL_PER_CALL: u64 = 100_000_000;
+const MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
 
 pub struct PluginWidget {
     store: Store<WasiState>,
@@ -33,12 +36,15 @@ impl PluginWidget {
         apply_capabilities(&mut builder, capabilities);
         let wasi = builder.build();
         let mut store = Store::new(&engine, WasiState::new(wasi));
+        store.limiter(|state| &mut state.limits);
+        refuel(&mut store)?;
 
         let binding = Box::new(
             WasmWidgetBinding::instantiate(&mut store, &component, &linker)
                 .map_err(|e| anyhow::anyhow!("instantiating wasm widget component: {e}"))?,
         );
 
+        refuel(&mut store)?;
         let requested = binding
             .ratatui_widget_widget()
             .call_capabilities(&mut store)
@@ -76,6 +82,7 @@ impl PluginWidget {
         buf: &mut Buffer,
         state: &mut Vec<u8>,
     ) -> Result<()> {
+        refuel(&mut self.store)?;
         let previous_state = (!state.is_empty()).then_some(state.as_slice());
         let RenderResult {
             commands,
@@ -95,6 +102,7 @@ impl PluginWidget {
 
     /// Delivers an input event and returns `true` if the widget consumed it.
     pub fn handle_event(&mut self, event: &Event) -> Result<bool> {
+        refuel(&mut self.store)?;
         self.binding
             .ratatui_widget_widget()
             .call_handle_event(&mut self.store, event)
@@ -207,9 +215,17 @@ fn apply_capabilities(builder: &mut WasiCtxBuilder, capabilities: &[String]) {
     }
 }
 
+/// Gives the guest a fresh fuel budget so a runaway call traps instead of hanging the host.
+fn refuel(store: &mut Store<WasiState>) -> Result<()> {
+    store
+        .set_fuel(FUEL_PER_CALL)
+        .map_err(|e| anyhow::anyhow!("setting widget fuel: {e}"))
+}
+
 struct WasiState {
     ctx: WasiCtx,
     table: wasmtime::component::ResourceTable,
+    limits: StoreLimits,
 }
 
 impl WasiState {
@@ -217,6 +233,10 @@ impl WasiState {
         Self {
             ctx,
             table: wasmtime::component::ResourceTable::new(),
+            limits: StoreLimitsBuilder::new()
+                .memory_size(MEMORY_LIMIT_BYTES)
+                .trap_on_grow_failure(true)
+                .build(),
         }
     }
 }

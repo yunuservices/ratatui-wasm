@@ -116,6 +116,8 @@ Plugins request capabilities in their manifest, but the host decides what they g
 
 Clock and file capabilities will follow the same pattern as WASI support expands.
 
+Every call into a plugin gets a fuel budget, and its memory is capped at 64 MiB, so a widget that loops forever or allocates without bound fails with an error instead of freezing the app.
+
 ## Hot reload and caching
 
 The host caches parsed WASM components keyed by file modification time. On each render it checks the file again, so a recompiled plugin is reloaded automatically while unmodified plugins stay fast.

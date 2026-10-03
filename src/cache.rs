@@ -5,8 +5,8 @@ use std::sync::{LazyLock, Mutex};
 use std::time::SystemTime;
 
 use anyhow::{Context, Result};
-use wasmtime::Engine;
 use wasmtime::component::Component;
+use wasmtime::{Config, Engine};
 
 struct CachedComponent {
     engine: Engine,
@@ -30,7 +30,8 @@ pub fn load_component(path: &Path) -> Result<(Engine, Component)> {
         return Ok((cached.engine.clone(), cached.component.clone()));
     }
 
-    let engine = Engine::default();
+    let engine = Engine::new(Config::new().consume_fuel(true))
+        .map_err(|e| anyhow::anyhow!("creating wasm engine: {e}"))?;
     let component = Component::from_file(&engine, path)
         .map_err(|e| anyhow::anyhow!("loading wasm component from {}: {e}", path.display()))?;
 
