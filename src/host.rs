@@ -201,17 +201,25 @@ impl StatefulWidget for StatefulWasmWidget {
 }
 
 fn apply_capabilities(builder: &mut WasiCtxBuilder, capabilities: &[String]) {
-    if capabilities.iter().any(|c| c == "stdio:stdout") {
-        builder.inherit_stdout();
-    }
-    if capabilities.iter().any(|c| c == "stdio:stderr") {
-        builder.inherit_stderr();
-    }
-    if capabilities.iter().any(|c| c == "stdio:stdin") {
-        builder.inherit_stdin();
-    }
-    if capabilities.iter().any(|c| c == "env:read") {
-        builder.inherit_env();
+    for capability in capabilities {
+        match capability.as_str() {
+            "stdio:stdout" => {
+                builder.inherit_stdout();
+            }
+            "stdio:stderr" => {
+                builder.inherit_stderr();
+            }
+            "stdio:stdin" => {
+                builder.inherit_stdin();
+            }
+            other => {
+                if let Some(name) = other.strip_prefix("env:")
+                    && let Ok(value) = std::env::var(name)
+                {
+                    builder.env(name, value);
+                }
+            }
+        }
     }
 }
 

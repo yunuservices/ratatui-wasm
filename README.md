@@ -112,7 +112,7 @@ Plugins request capabilities in their manifest, but the host decides what they g
 | `stdio:stdout` | Write to host stdout |
 | `stdio:stderr` | Write to host stderr |
 | `stdio:stdin` | Read from host stdin |
-| `env:read` | Read host environment variables |
+| `env:<NAME>` | Read the host environment variable `<NAME>`, e.g. `env:HOME` |
 
 Clock and file capabilities will follow the same pattern as WASI support expands.
 
