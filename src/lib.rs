@@ -1,7 +1,8 @@
 use ratatui_core::buffer::{Buffer, Cell};
-use ratatui_core::layout::{Alignment, Rect};
+use ratatui_core::layout::{Alignment, Position, Rect};
 use ratatui_core::style::{Color, Modifier, Style};
 use ratatui_core::text::{Line, Span};
+use ratatui_core::widgets::Widget;
 
 use crate::generated::exports::ratatui::widget::widget::{
     Alignment as WitAlignment, Cell as WitCell, Color as WitColor, Line as WitLine,
@@ -111,7 +112,7 @@ pub fn blit_commands(area: Rect, commands: &[RenderCommand], buf: &mut Buffer) {
 fn blit_cell(area: Rect, wit_cell: &WitCell, buf: &mut Buffer) {
     let x = area.x.saturating_add(wit_cell.x);
     let y = area.y.saturating_add(wit_cell.y);
-    if x >= area.right() || y >= area.bottom() {
+    if x >= area.right() || y >= area.bottom() || !buf.area.contains(Position { x, y }) {
         return;
     }
 
@@ -141,12 +142,5 @@ fn blit_line(area: Rect, wit_line: &WitLine, buf: &mut Buffer) {
         line = line.alignment(convert_alignment(alignment));
     }
 
-    let line_width = u16::try_from(line.width()).unwrap_or(u16::MAX);
-    let x = match wit_line.alignment {
-        Some(WitAlignment::Center) => area.x + area.width.saturating_sub(line_width) / 2,
-        Some(WitAlignment::Right) => area.right().saturating_sub(line_width),
-        _ => area.x,
-    };
-
-    buf.set_line(x, y, &line, area.width);
+    line.render(Rect::new(area.x, y, area.width, 1), buf);
 }

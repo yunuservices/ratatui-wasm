@@ -1,7 +1,7 @@
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_wasm::blit_commands;
-use ratatui_wasm::wit::{Alignment, Color, Line, RenderCommand, Span, Style};
+use ratatui_wasm::wit::{Alignment, Cell, Color, Line, RenderCommand, Span, Style};
 
 #[test]
 fn blit_left_aligned_line() {
@@ -65,4 +65,31 @@ fn blit_centered_line() {
     assert!(text.contains("center"));
     assert!(text.starts_with("  "));
     assert!(text.trim_end().len() < 20);
+}
+
+#[test]
+fn commands_outside_the_buffer_are_skipped() {
+    let mut buf = Buffer::empty(Rect::new(0, 0, 4, 2));
+    let area = Rect::new(0, 0, 10, 10);
+    let commands = [
+        RenderCommand::Cell(Cell {
+            x: 8,
+            y: 8,
+            symbol: "x".to_string(),
+            fg: None,
+            bg: None,
+        }),
+        RenderCommand::Line(Line {
+            y: 5,
+            spans: vec![Span {
+                content: "hidden".to_string(),
+                style: None,
+            }],
+            alignment: None,
+        }),
+    ];
+
+    blit_commands(area, &commands, &mut buf);
+
+    assert_eq!(buf, Buffer::empty(Rect::new(0, 0, 4, 2)));
 }
