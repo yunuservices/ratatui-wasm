@@ -13,26 +13,50 @@ use crate::manifest::PluginManifest;
 use crate::rect_to_wit;
 use crate::wit::{Event, RenderResult};
 
-const FUEL_PER_CALL: u64 = 100_000_000;
-const MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
+/// Resource limits applied to every plugin call.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    /// Fuel available to each call. A call that runs out of fuel fails instead of hanging.
+    pub fuel_per_call: u64,
+    pub memory_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            fuel_per_call: 100_000_000,
+            memory_bytes: 64 * 1024 * 1024,
+        }
+    }
+}
 
 pub struct PluginWidget {
     store: Store<WasiState>,
     binding: Box<WasmWidgetBinding>,
     capabilities: Vec<String>,
+    limits: Limits,
 }
 
 impl PluginWidget {
-    /// Loads a `.wasm` component and fails if it requests a capability that was not granted.
+    /// Loads a `.wasm` component with the default [`Limits`] and fails if it requests a
+    /// capability that was not granted.
     pub fn from_file(path: impl AsRef<Path>, capabilities: &[String]) -> Result<Self> {
+        Self::from_file_with_limits(path, capabilities, Limits::default())
+    }
+
+    pub fn from_file_with_limits(
+        path: impl AsRef<Path>,
+        capabilities: &[String],
+        limits: Limits,
+    ) -> Result<Self> {
         let widget_pre = cache::load_widget(path.as_ref())?;
 
         let mut builder = WasiCtxBuilder::new();
         apply_capabilities(&mut builder, capabilities);
         let wasi = builder.build();
-        let mut store = Store::new(widget_pre.engine(), WasiState::new(wasi));
-        store.limiter(|state| &mut state.limits);
-        refuel(&mut store)?;
+        let mut store = Store::new(widget_pre.engine(), WasiState::new(wasi, limits));
+        store.limiter(|state| &mut state.store_limits);
+        refuel(&mut store, limits)?;
 
         let binding = Box::new(
             widget_pre
@@ -40,7 +64,7 @@ impl PluginWidget {
                 .map_err(|e| anyhow::anyhow!("instantiating wasm widget component: {e}"))?,
         );
 
-        refuel(&mut store)?;
+        refuel(&mut store, limits)?;
         let requested = binding
             .ratatui_widget_widget()
             .call_capabilities(&mut store)
@@ -54,6 +78,7 @@ impl PluginWidget {
             store,
             binding,
             capabilities: capabilities.to_vec(),
+            limits,
         })
     }
 
@@ -78,7 +103,7 @@ impl PluginWidget {
         buf: &mut Buffer,
         state: &mut Vec<u8>,
     ) -> Result<()> {
-        refuel(&mut self.store)?;
+        refuel(&mut self.store, self.limits)?;
         let previous_state = (!state.is_empty()).then_some(state.as_slice());
         let RenderResult {
             commands,
@@ -98,7 +123,7 @@ impl PluginWidget {
 
     /// Delivers an input event and returns `true` if the widget consumed it.
     pub fn handle_event(&mut self, event: &Event) -> Result<bool> {
-        refuel(&mut self.store)?;
+        refuel(&mut self.store, self.limits)?;
         self.binding
             .ratatui_widget_widget()
             .call_handle_event(&mut self.store, event)
@@ -119,6 +144,7 @@ impl PluginWidget {
 pub struct WasmWidget {
     path: PathBuf,
     capabilities: Vec<String>,
+    limits: Limits,
 }
 
 impl WasmWidget {
@@ -126,7 +152,14 @@ impl WasmWidget {
         Self {
             path: path.as_ref().to_path_buf(),
             capabilities: capabilities.to_vec(),
+            limits: Limits::default(),
         }
+    }
+
+    #[must_use]
+    pub const fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
     }
 
     pub fn from_manifest(path: impl AsRef<Path>, allowed: &[String]) -> Result<Self> {
@@ -141,7 +174,7 @@ impl WasmWidget {
 
 impl ratatui_core::widgets::Widget for WasmWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        match PluginWidget::from_file(&self.path, &self.capabilities) {
+        match PluginWidget::from_file_with_limits(&self.path, &self.capabilities, self.limits) {
             Ok(mut plugin) => {
                 if let Err(err) = plugin.render(area, buf) {
                     tracing::debug!("failed to render WASM widget: {err:#}");
@@ -159,6 +192,7 @@ impl ratatui_core::widgets::Widget for WasmWidget {
 pub struct StatefulWasmWidget {
     path: PathBuf,
     capabilities: Vec<String>,
+    limits: Limits,
 }
 
 impl StatefulWasmWidget {
@@ -166,7 +200,14 @@ impl StatefulWasmWidget {
         Self {
             path: path.as_ref().to_path_buf(),
             capabilities: capabilities.to_vec(),
+            limits: Limits::default(),
         }
+    }
+
+    #[must_use]
+    pub const fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
     }
 
     pub fn from_manifest(path: impl AsRef<Path>, allowed: &[String]) -> Result<Self> {
@@ -183,7 +224,7 @@ impl StatefulWidget for StatefulWasmWidget {
     type State = Vec<u8>;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Vec<u8>) {
-        match PluginWidget::from_file(&self.path, &self.capabilities) {
+        match PluginWidget::from_file_with_limits(&self.path, &self.capabilities, self.limits) {
             Ok(mut plugin) => {
                 if let Err(err) = plugin.render_stateful(area, buf, state) {
                     tracing::debug!("failed to render stateful WASM widget: {err:#}");
@@ -220,25 +261,25 @@ fn apply_capabilities(builder: &mut WasiCtxBuilder, capabilities: &[String]) {
 }
 
 /// Gives the guest a fresh fuel budget so a runaway call traps instead of hanging the host.
-fn refuel(store: &mut Store<WasiState>) -> Result<()> {
+fn refuel(store: &mut Store<WasiState>, limits: Limits) -> Result<()> {
     store
-        .set_fuel(FUEL_PER_CALL)
+        .set_fuel(limits.fuel_per_call)
         .map_err(|e| anyhow::anyhow!("setting widget fuel: {e}"))
 }
 
 pub(crate) struct WasiState {
     ctx: WasiCtx,
     table: wasmtime::component::ResourceTable,
-    limits: StoreLimits,
+    store_limits: StoreLimits,
 }
 
 impl WasiState {
-    fn new(ctx: WasiCtx) -> Self {
+    fn new(ctx: WasiCtx, limits: Limits) -> Self {
         Self {
             ctx,
             table: wasmtime::component::ResourceTable::new(),
-            limits: StoreLimitsBuilder::new()
-                .memory_size(MEMORY_LIMIT_BYTES)
+            store_limits: StoreLimitsBuilder::new()
+                .memory_size(limits.memory_bytes)
                 .trap_on_grow_failure(true)
                 .build(),
         }

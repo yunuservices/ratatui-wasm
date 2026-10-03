@@ -1,7 +1,7 @@
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::widgets::Widget;
-use ratatui_wasm::{PluginWidget, StatefulWasmWidget, WasmWidget, event};
+use ratatui_wasm::{Limits, PluginWidget, StatefulWasmWidget, WasmWidget, event};
 
 const HELLO_RUST_MANIFEST: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -179,4 +179,22 @@ fn widget_fails_with_invalid_wasm_file() {
     let result = PluginWidget::from_file(&invalid_wasm, &[]);
     assert!(result.is_err());
     let _ = std::fs::remove_file(&invalid_wasm);
+}
+
+#[test]
+fn widget_fails_when_fuel_runs_out() {
+    let limits = Limits {
+        fuel_per_call: 1,
+        ..Limits::default()
+    };
+    assert!(PluginWidget::from_file_with_limits(HELLO_RUST_WASM, &[], limits).is_err());
+}
+
+#[test]
+fn widget_fails_when_memory_limit_is_too_small() {
+    let limits = Limits {
+        memory_bytes: 64 * 1024,
+        ..Limits::default()
+    };
+    assert!(PluginWidget::from_file_with_limits(HELLO_RUST_WASM, &[], limits).is_err());
 }

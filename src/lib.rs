@@ -16,7 +16,7 @@ pub mod manifest;
 
 mod cache;
 
-pub use host::{PluginWidget, StatefulWasmWidget, WasmWidget};
+pub use host::{Limits, PluginWidget, StatefulWasmWidget, WasmWidget};
 
 pub mod wit {
     pub use super::generated::exports::ratatui::widget::widget::{

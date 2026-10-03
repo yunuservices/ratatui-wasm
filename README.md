@@ -118,6 +118,18 @@ Clock and file capabilities will follow the same pattern as WASI support expands
 
 Every call into a plugin gets a fuel budget, and its memory is capped at 64 MiB, so a widget that loops forever or allocates without bound fails with an error instead of freezing the app.
 
+The defaults can be changed with `Limits`:
+
+```rust
+use ratatui_wasm::{Limits, WasmWidget};
+
+let limits = Limits {
+    fuel_per_call: 10_000_000,
+    memory_bytes: 16 * 1024 * 1024,
+};
+let widget = WasmWidget::from_file("hello_rust.wasm", &[]).with_limits(limits);
+```
+
 ## Hot reload and caching
 
 All plugins share one engine. Each component is compiled and linked once and cached by file modification time, so a render only creates a fresh instance. A recompiled plugin is picked up on the next frame.
