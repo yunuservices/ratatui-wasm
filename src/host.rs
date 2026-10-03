@@ -55,11 +55,13 @@ impl PluginWidget {
         })
     }
 
-    pub fn from_manifest(path: impl AsRef<Path>) -> Result<Self> {
+    /// Loads the widget described by a `ratatui.plugin.toml` manifest, granting only the requested
+    /// capabilities that appear in `allowed`.
+    pub fn from_manifest(path: impl AsRef<Path>, allowed: &[String]) -> Result<Self> {
         let manifest = PluginManifest::from_file(&path)?;
         let manifest_dir = path.as_ref().parent().unwrap_or_else(|| Path::new("."));
         let entry = manifest.resolve_entry(manifest_dir);
-        Self::from_file(entry, &manifest.granted_capabilities())
+        Self::from_file(entry, &manifest.grant(allowed)?)
     }
 
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) -> Result<()> {
@@ -123,12 +125,12 @@ impl WasmWidget {
         }
     }
 
-    pub fn from_manifest(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+    pub fn from_manifest(path: impl AsRef<Path>, allowed: &[String]) -> Result<Self> {
         let manifest = PluginManifest::from_file(&path)?;
         let manifest_dir = path.as_ref().parent().unwrap_or_else(|| Path::new("."));
         Ok(Self::from_file(
             manifest.resolve_entry(manifest_dir),
-            &manifest.granted_capabilities(),
+            &manifest.grant(allowed)?,
         ))
     }
 }
@@ -163,12 +165,12 @@ impl StatefulWasmWidget {
         }
     }
 
-    pub fn from_manifest(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+    pub fn from_manifest(path: impl AsRef<Path>, allowed: &[String]) -> Result<Self> {
         let manifest = PluginManifest::from_file(&path)?;
         let manifest_dir = path.as_ref().parent().unwrap_or_else(|| Path::new("."));
         Ok(Self::from_file(
             manifest.resolve_entry(manifest_dir),
-            &manifest.granted_capabilities(),
+            &manifest.grant(allowed)?,
         ))
     }
 }

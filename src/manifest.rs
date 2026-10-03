@@ -49,9 +49,19 @@ impl PluginManifest {
         }
     }
 
-    /// Capabilities to grant the plugin. Optional capabilities are not granted yet.
-    pub fn granted_capabilities(&self) -> Vec<String> {
-        self.capabilities.required.clone()
+    /// Grants the requested capabilities that the host allows and fails if a required one is not
+    /// allowed.
+    pub fn grant(&self, allowed: &[String]) -> Result<Vec<String>> {
+        let Capabilities { required, optional } = &self.capabilities;
+        if let Some(denied) = required.iter().find(|c| !allowed.contains(c)) {
+            anyhow::bail!("plugin requires capability `{denied}` which the host does not allow");
+        }
+        Ok(required
+            .iter()
+            .chain(optional)
+            .filter(|c| allowed.contains(c))
+            .cloned()
+            .collect())
     }
 }
 
@@ -99,6 +109,30 @@ entry = "plugin.wasm"
         let manifest = PluginManifest::parse(content).unwrap();
         assert_eq!(manifest.capabilities.required, Vec::<String>::new());
         assert_eq!(manifest.capabilities.optional, Vec::<String>::new());
-        assert_eq!(manifest.granted_capabilities(), Vec::<String>::new());
+        assert_eq!(manifest.grant(&[]).unwrap(), Vec::<String>::new());
+    }
+
+    const REQUESTING_MANIFEST: &str = r#"
+[plugin]
+name = "requesting"
+version = "1.0.0"
+entry = "plugin.wasm"
+
+[capabilities]
+required = ["stdio:stdout"]
+optional = ["stdio:stderr", "stdio:stdin"]
+"#;
+
+    #[test]
+    fn grant_fails_when_required_capability_is_not_allowed() {
+        let manifest = PluginManifest::parse(REQUESTING_MANIFEST).unwrap();
+        assert!(manifest.grant(&[]).is_err());
+    }
+
+    #[test]
+    fn grant_keeps_only_allowed_capabilities() {
+        let manifest = PluginManifest::parse(REQUESTING_MANIFEST).unwrap();
+        let allowed = ["stdio:stdout".to_string(), "stdio:stdin".to_string()];
+        assert_eq!(manifest.grant(&allowed).unwrap(), allowed);
     }
 }

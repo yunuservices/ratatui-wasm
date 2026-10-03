@@ -16,8 +16,8 @@ Ratatui applications normally bundle every widget as Rust code. This crate turns
 
 A guest module exports the `ratatui:widget/widget` interface defined in `wit/widget.wit`. The host:
 
-1. Loads the `.wasm` component and checks its declared capabilities against the manifest.
-2. Builds a `WasiCtx` with only the granted capabilities.
+1. Grants the capabilities the plugin requests only if the host allows them.
+2. Builds a `WasiCtx` with only the granted capabilities and loads the `.wasm` component.
 3. Calls `render` and receives draw commands such as cells or styled lines.
 4. Blits those commands onto a `ratatui_core::buffer::Buffer`.
 
@@ -94,17 +94,18 @@ let consumed = plugin.handle_event(&event::key(event::char_key('q'), 0))?;
 
 ### Load from a manifest
 
-A `ratatui.plugin.toml` file keeps metadata, the entry wasm path, and required capabilities.
+A `ratatui.plugin.toml` file keeps metadata, the entry wasm path, and the capabilities the plugin requests. The host passes the capabilities it allows.
 
 ```rust
 use ratatui_wasm::WasmWidget;
 
-let widget = WasmWidget::from_manifest("my-widget/ratatui.plugin.toml")?;
+let allowed = ["stdio:stdout".to_string()];
+let widget = WasmWidget::from_manifest("my-widget/ratatui.plugin.toml", &allowed)?;
 ```
 
 ## Capabilities
 
-Plugins declare what they need. The host refuses to load a plugin that asks for a capability it was not granted. The manifest is the source of truth; the WASI context is configured from it.
+Plugins request capabilities in their manifest, but the host decides what they get. A plugin is refused if it requires a capability the host does not allow, and optional capabilities are granted only when allowed.
 
 | Capability | Meaning |
 |------------|---------|

@@ -93,7 +93,7 @@ fn stateful_widget_persists_state() {
 #[test]
 fn loads_widget_from_manifest() {
     let mut widget =
-        PluginWidget::from_manifest(HELLO_RUST_MANIFEST).expect("manifest loads widget");
+        PluginWidget::from_manifest(HELLO_RUST_MANIFEST, &[]).expect("manifest loads widget");
     let mut buf = Buffer::empty(Rect::new(0, 0, 40, 3));
     widget
         .render(Rect::new(0, 0, 40, 3), &mut buf)
@@ -113,7 +113,8 @@ fn loads_widget_from_manifest() {
 
 #[test]
 fn wasm_widget_from_manifest_renders() {
-    let widget = WasmWidget::from_manifest(HELLO_RUST_MANIFEST).expect("manifest creates widget");
+    let widget =
+        WasmWidget::from_manifest(HELLO_RUST_MANIFEST, &[]).expect("manifest creates widget");
     let mut buf = Buffer::empty(Rect::new(0, 0, 40, 3));
     ratatui_core::widgets::Widget::render(widget, Rect::new(0, 0, 40, 3), &mut buf);
 
@@ -160,13 +161,13 @@ fn from_file_fails_when_wasm_missing() {
 
 #[test]
 fn from_manifest_fails_when_manifest_missing() {
-    let result = PluginWidget::from_manifest("/tmp/ratatui-wasm-missing.toml");
+    let result = PluginWidget::from_manifest("/tmp/ratatui-wasm-missing.toml", &[]);
     assert!(result.is_err());
 }
 
 #[test]
 fn wasm_widget_from_manifest_fails_when_missing() {
-    let result = WasmWidget::from_manifest("/tmp/ratatui-wasm-missing.toml");
+    let result = WasmWidget::from_manifest("/tmp/ratatui-wasm-missing.toml", &[]);
     assert!(result.is_err());
 }
 

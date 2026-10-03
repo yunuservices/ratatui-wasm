@@ -24,6 +24,9 @@ enum Command {
     Check {
         /// Path to a `ratatui.plugin.toml` file.
         manifest: PathBuf,
+        /// Capability the host allows, such as `stdio:stdout`. Can be repeated.
+        #[arg(long = "allow")]
+        allowed: Vec<String>,
     },
     /// Build a plugin guest crate for `wasm32-wasip2`.
     Build {
@@ -36,7 +39,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::List { dir } => list_plugins(&dir),
-        Command::Check { manifest } => check_manifest(&manifest),
+        Command::Check { manifest, allowed } => check_manifest(&manifest, &allowed),
         Command::Build { guest_dir } => build_guest(&guest_dir),
     }
 }
@@ -62,8 +65,8 @@ fn list_plugins(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn check_manifest(manifest: &Path) -> Result<()> {
-    let widget = PluginWidget::from_manifest(manifest)?;
+fn check_manifest(manifest: &Path, allowed: &[String]) -> Result<()> {
+    let widget = PluginWidget::from_manifest(manifest, allowed)?;
     let capabilities = widget
         .capabilities()
         .iter()
@@ -129,10 +132,17 @@ mod tests {
 
     #[test]
     fn clap_command_parses_check() {
-        let cli = Cli::parse_from(["ratatui-wasm", "check", "/tmp/test.plugin.toml"]);
+        let cli = Cli::parse_from([
+            "ratatui-wasm",
+            "check",
+            "/tmp/test.plugin.toml",
+            "--allow",
+            "stdio:stdout",
+        ]);
         match cli.command {
-            Command::Check { manifest } => {
+            Command::Check { manifest, allowed } => {
                 assert_eq!(manifest, PathBuf::from("/tmp/test.plugin.toml"));
+                assert_eq!(allowed, ["stdio:stdout"]);
             }
             _ => panic!("expected Check command"),
         }
@@ -212,7 +222,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/examples/wasm-widgets/hello-rust/ratatui.plugin.toml"
         );
-        check_manifest(Path::new(manifest)).expect("check_manifest should succeed");
+        check_manifest(Path::new(manifest), &[]).expect("check_manifest should succeed");
     }
 
     #[test]
@@ -243,7 +253,7 @@ mod tests {
             "[plugin]\nname = \"missing\"\nversion = \"1.0\"\nentry = \"missing.wasm\"\n",
         )
         .unwrap();
-        let result = check_manifest(&manifest);
+        let result = check_manifest(&manifest, &[]);
         assert!(result.is_err());
         let _ = fs::remove_dir_all(&temp_dir);
     }
