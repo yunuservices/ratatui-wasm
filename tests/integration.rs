@@ -1,3 +1,7 @@
+use std::fs::{self, File};
+use std::path::Path;
+use std::time::{Duration, SystemTime};
+
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::widgets::{StatefulWidget, Widget};
@@ -145,7 +149,7 @@ fn wasm_widget_from_manifest_renders() {
 
 #[test]
 fn c_guest_renders() {
-    if !std::path::Path::new(HELLO_C_WASM).exists() {
+    if !Path::new(HELLO_C_WASM).exists() {
         return;
     }
     let mut widget = PluginWidget::from_file(HELLO_C_WASM, &[]).expect("C widget loads");
@@ -188,10 +192,10 @@ fn wasm_widget_from_manifest_fails_when_missing() {
 fn widget_fails_with_invalid_wasm_file() {
     let invalid_wasm =
         std::env::temp_dir().join(format!("ratatui-wasm-bad-{}", std::process::id()));
-    std::fs::write(&invalid_wasm, b"not a wasm component").unwrap();
+    fs::write(&invalid_wasm, b"not a wasm component").unwrap();
     let result = PluginWidget::from_file(&invalid_wasm, &[]);
     assert!(result.is_err());
-    let _ = std::fs::remove_file(&invalid_wasm);
+    let _ = fs::remove_file(&invalid_wasm);
 }
 
 #[test]
@@ -249,4 +253,35 @@ fn probe_consumes_only_the_plus_key() {
     let quit = event::key(event::char_key('q'), 0);
     assert!(widget.handle_event(&plus).expect("probe handles +"));
     assert!(!widget.handle_event(&quit).expect("probe handles q"));
+}
+
+#[test]
+fn widget_reloads_when_the_file_changes() {
+    let plugin_path =
+        std::env::temp_dir().join(format!("ratatui-wasm-reload-{}.wasm", std::process::id()));
+    let mut buf = Buffer::empty(Rect::new(0, 0, 60, 1));
+
+    replace_plugin(&plugin_path, HELLO_RUST_WASM, 1);
+    WasmWidget::from_file(&plugin_path, &probe_capabilities()).render(buf.area, &mut buf);
+    assert_eq!(first_line(&buf), "Hello from WASM");
+
+    replace_plugin(&plugin_path, PROBE_WASM, 2);
+    buf.reset();
+    WasmWidget::from_file(&plugin_path, &probe_capabilities()).render(buf.area, &mut buf);
+    assert_eq!(first_line(&buf), "count=1 package=ratatui-wasm path=false");
+
+    let _ = fs::remove_file(&plugin_path);
+}
+
+/// Copies `source` over `target` with an explicit modification time, so the reload does not
+/// depend on the file system's timestamp resolution.
+fn replace_plugin(target: &Path, source: &str, modified_secs: u64) {
+    fs::copy(source, target).expect("plugin copied");
+    File::options()
+        .write(true)
+        .open(target)
+        .and_then(|file| {
+            file.set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(modified_secs))
+        })
+        .expect("modification time set");
 }
