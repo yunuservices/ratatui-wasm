@@ -144,3 +144,64 @@ fn blit_line(area: Rect, wit_line: &WitLine, buf: &mut Buffer) {
 
     line.render(Rect::new(area.x, y, area.width, 1), buf);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::wit::RgbColor;
+
+    #[test]
+    fn rect_to_wit_keeps_every_field() {
+        let wit_rect = rect_to_wit(Rect::new(1, 2, 3, 4));
+        assert_eq!(
+            (wit_rect.x, wit_rect.y, wit_rect.width, wit_rect.height),
+            (1, 2, 3, 4)
+        );
+    }
+
+    #[test]
+    fn convert_color_maps_named_and_rgb_colors() {
+        assert_eq!(convert_color(WitColor::Reset), Color::Reset);
+        assert_eq!(convert_color(WitColor::DarkGray), Color::DarkGray);
+        assert_eq!(convert_color(WitColor::LightMagenta), Color::LightMagenta);
+        assert_eq!(
+            convert_color(WitColor::Rgb(RgbColor { r: 1, g: 2, b: 3 })),
+            Color::Rgb(1, 2, 3)
+        );
+    }
+
+    #[test]
+    fn convert_style_maps_colors_and_modifiers() {
+        let wit_style = WitStyle {
+            fg: Some(WitColor::Red),
+            bg: Some(WitColor::Blue),
+            bold: true,
+            italic: true,
+            underline: true,
+        };
+        let expected = Style::new()
+            .fg(Color::Red)
+            .bg(Color::Blue)
+            .add_modifier(Modifier::BOLD | Modifier::ITALIC | Modifier::UNDERLINED);
+        assert_eq!(convert_style(&wit_style), expected);
+    }
+
+    #[test]
+    fn convert_style_without_fields_is_empty() {
+        let wit_style = WitStyle {
+            fg: None,
+            bg: None,
+            bold: false,
+            italic: false,
+            underline: false,
+        };
+        assert_eq!(convert_style(&wit_style), Style::new());
+    }
+
+    #[test]
+    fn convert_alignment_maps_every_variant() {
+        assert_eq!(convert_alignment(WitAlignment::Left), Alignment::Left);
+        assert_eq!(convert_alignment(WitAlignment::Center), Alignment::Center);
+        assert_eq!(convert_alignment(WitAlignment::Right), Alignment::Right);
+    }
+}
