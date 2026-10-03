@@ -9,7 +9,7 @@ readme = "README.md"
 description = "Capability-based WebAssembly plugin host for Ratatui widgets"
 keywords = ["ratatui", "tui", "wasm", "plugin", "terminal"]
 categories = ["command-line-interface"]
-exclude = [".github", "examples/wasm-widgets/*/target"]
+exclude = [".github", "examples/wasm-widgets/*/target", "tests/fixtures"]
 
 [dependencies]
 anyhow = "1"
@@ -37,7 +37,7 @@ workspace = true
 resolver = "2"
 members = [".", "examples/wasm-demo"]
 default-members = ["."]
-exclude = ["examples/wasm-widgets/hello-rust"]
+exclude = ["examples/wasm-widgets/hello-rust", "tests/fixtures/probe"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
