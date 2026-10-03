@@ -1,6 +1,6 @@
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
-use ratatui_core::widgets::Widget;
+use ratatui_core::widgets::{StatefulWidget, Widget};
 use ratatui_wasm::{Limits, PluginWidget, StatefulWasmWidget, WasmWidget, event};
 
 const HELLO_RUST_MANIFEST: &str = concat!(
@@ -15,6 +15,24 @@ const HELLO_C_WASM: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/examples/wasm-widgets/hello-c/hello_c.wasm"
 );
+const PROBE_WASM: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/probe/target/wasm32-wasip2/release/probe.wasm"
+);
+const PROBE_CAPABILITY: &str = "env:CARGO_PKG_NAME";
+
+fn probe_capabilities() -> Vec<String> {
+    vec![PROBE_CAPABILITY.to_string()]
+}
+
+fn first_line(buf: &Buffer) -> String {
+    let width = usize::from(buf.area.width);
+    let line: String = buf.content()[..width]
+        .iter()
+        .map(ratatui_core::buffer::Cell::symbol)
+        .collect();
+    line.trim_end().to_string()
+}
 
 #[test]
 fn loads_and_renders_hello_rust() {
@@ -55,7 +73,7 @@ fn wasm_widget_wrapper_renders_via_widget_trait() {
 }
 
 #[test]
-fn widget_handles_key_events() {
+fn hello_rust_ignores_key_events() {
     let mut widget = PluginWidget::from_file(HELLO_RUST_WASM, &[]).expect("widget loads");
 
     let event = event::key(event::char_key('q'), 0);
@@ -66,16 +84,11 @@ fn widget_handles_key_events() {
 }
 
 #[test]
-fn stateful_widget_persists_state() {
+fn stateless_guest_leaves_state_empty() {
     let widget = StatefulWasmWidget::from_file(HELLO_RUST_WASM, &[]);
     let mut state: Vec<u8> = Vec::new();
     let mut buf = Buffer::empty(Rect::new(0, 0, 40, 3));
-    ratatui_core::widgets::StatefulWidget::render(
-        widget,
-        Rect::new(0, 0, 40, 3),
-        &mut buf,
-        &mut state,
-    );
+    StatefulWidget::render(widget, Rect::new(0, 0, 40, 3), &mut buf, &mut state);
 
     let line: String = buf
         .content()
@@ -197,4 +210,43 @@ fn widget_fails_when_memory_limit_is_too_small() {
         ..Limits::default()
     };
     assert!(PluginWidget::from_file_with_limits(HELLO_RUST_WASM, &[], limits).is_err());
+}
+
+#[test]
+fn probe_is_refused_without_its_capability() {
+    let Err(err) = PluginWidget::from_file(PROBE_WASM, &[]) else {
+        panic!("probe loaded without its capability");
+    };
+    assert!(format!("{err:#}").contains(PROBE_CAPABILITY), "got {err:#}");
+}
+
+#[test]
+fn probe_sees_only_granted_environment_variables() {
+    let mut widget =
+        PluginWidget::from_file(PROBE_WASM, &probe_capabilities()).expect("probe loads");
+    let mut buf = Buffer::empty(Rect::new(0, 0, 60, 1));
+    widget.render(buf.area, &mut buf).expect("probe renders");
+    assert_eq!(first_line(&buf), "count=1 package=ratatui-wasm path=false");
+}
+
+#[test]
+fn stateful_widget_persists_state_between_frames() {
+    let mut state = Vec::new();
+    let mut buf = Buffer::empty(Rect::new(0, 0, 60, 1));
+    for _ in 0..2 {
+        StatefulWasmWidget::from_file(PROBE_WASM, &probe_capabilities())
+            .render(buf.area, &mut buf, &mut state);
+    }
+    assert_eq!(first_line(&buf), "count=2 package=ratatui-wasm path=false");
+    assert_eq!(state, 2u32.to_le_bytes());
+}
+
+#[test]
+fn probe_consumes_only_the_plus_key() {
+    let mut widget =
+        PluginWidget::from_file(PROBE_WASM, &probe_capabilities()).expect("probe loads");
+    let plus = event::key(event::char_key('+'), 0);
+    let quit = event::key(event::char_key('q'), 0);
+    assert!(widget.handle_event(&plus).expect("probe handles +"));
+    assert!(!widget.handle_event(&quit).expect("probe handles q"));
 }
