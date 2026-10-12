@@ -9,7 +9,7 @@ readme = "README.md"
 description = "Capability-based WebAssembly plugin host for Ratatui widgets"
 keywords = ["ratatui", "tui", "wasm", "plugin", "terminal"]
 categories = ["command-line-interface"]
-exclude = [".github", "assets", "examples/wasm-widgets/*/target", "tests/fixtures"]
+exclude = [".github", "assets", "examples", "tests"]
 
 [dependencies]
 anyhow = "1"
