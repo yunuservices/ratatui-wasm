@@ -2,6 +2,8 @@
 
 Capability-based WebAssembly plugin host for Ratatui widgets.
 
+![Editing and rebuilding a WASM widget while the Ratatui app keeps running](assets/hot-reload.gif)
+
 Load `.wasm` components at runtime and render them inside a Ratatui application without rebuilding the host. Each plugin declares the capabilities it needs, and the host only grants those capabilities through WASI.
 
 ## Why
