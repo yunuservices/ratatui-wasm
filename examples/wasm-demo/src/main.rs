@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::layout::{Constraint, Layout};
-use ratatui::widgets::{Block, Paragraph};
+use ratatui::widgets::Block;
 use ratatui_wasm::WasmWidget;
 
 const HELLO_RUST_WASM: &str =
@@ -18,19 +17,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ratatui::run(|terminal| {
         loop {
             terminal.draw(|frame| {
-                let [plugin_area, status_area] =
-                    Layout::vertical([Constraint::Min(3), Constraint::Length(1)])
-                        .areas(frame.area());
-
-                let block = Block::bordered().title("WASM Widget");
-                let widget_area = block.inner(plugin_area);
-                frame.render_widget(block, plugin_area);
+                let block = Block::bordered()
+                    .title("WASM Widget")
+                    .title_bottom(format!(" Counter: {counter} | +/- adjust | q quit "));
+                let widget_area = block.inner(frame.area());
+                frame.render_widget(block, frame.area());
                 frame.render_widget(WasmWidget::from_file(&widget_path, &[]), widget_area);
-
-                frame.render_widget(
-                    Paragraph::new(format!("Counter: {counter}  |  +/- adjust  |  q quit")),
-                    status_area,
-                );
             })?;
 
             if let Event::Key(key) = crossterm::event::read()? {
